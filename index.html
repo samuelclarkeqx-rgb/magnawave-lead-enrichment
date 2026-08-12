@@ -4,78 +4,44 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>MagnaWave Lead Enrichment</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f2a4a; }
-  input { outline: none; }
+  body { background: #0f2a4a; font-family: 'Inter', sans-serif; color: #eaf3fb; min-height: 100vh; }
+  input { outline: none; font-family: 'Inter', sans-serif; }
   input::placeholder { color: #5f80a3; }
+  button { font-family: 'Space Grotesk', sans-serif; cursor: pointer; }
+  @keyframes pulseTravel {
+    0% { stroke-dasharray: 40 900; stroke-dashoffset: 940; }
+    100% { stroke-dasharray: 40 900; stroke-dashoffset: 0; }
+  }
+  @keyframes pulseTravelSlow {
+    0% { stroke-dasharray: 60 900; stroke-dashoffset: 960; }
+    100% { stroke-dasharray: 60 900; stroke-dashoffset: 0; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .mw-fade { animation: fadeUp 0.35s ease both; }
+  .mw-btn { transition: transform 0.15s ease; border: none; }
+  .mw-btn:hover { transform: translateY(-1px); }
+  .mw-btn:active { transform: translateY(0); }
+  .pulse-wave path { animation: pulseTravelSlow 6s linear infinite; }
+  .pulse-wave.active path { animation: pulseTravel 1.4s linear infinite; }
+  ul { padding-left: 18px; }
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef } = React;
-const { Search, Copy, RefreshCw, Download, CheckCircle2, AlertTriangle, Radio, Building2, MapPin, Users, Globe, Tag, Mail, Check } = LucideReact;
 
+<script>
 const COLORS = {
   bg: "#0f2a4a", bgDeep: "#0a1f38", panel: "#123458", panelBorder: "#1e4a76",
   cyan: "#38bdf8", cyanSoft: "#7dd3fc", violet: "#a78bfa", text: "#eaf3fb",
   textDim: "#93b3d1", textFaint: "#5f80a3", amber: "#fbbf24", rose: "#fb7185", green: "#4ade80",
 };
-
-function PulseWave({ active = false, height = 46 }) {
-  return (
-    <div style={{ width: "100%", height, overflow: "hidden", position: "relative" }}>
-      <svg viewBox="0 0 600 60" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-        <defs>
-          <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={COLORS.cyan} stopOpacity="0" />
-            <stop offset="15%" stopColor={COLORS.cyan} stopOpacity="0.9" />
-            <stop offset="50%" stopColor={COLORS.violet} stopOpacity="0.9" />
-            <stop offset="85%" stopColor={COLORS.cyan} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={COLORS.cyan} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d="M0,30 C15,30 20,10 35,10 C50,10 55,50 70,50 C85,50 90,30 105,30 L150,30 C165,30 170,10 185,10 C200,10 205,50 220,50 C235,50 240,30 255,30 L300,30 C315,30 320,10 335,10 C350,10 355,50 370,50 C385,50 390,30 405,30 L450,30 C465,30 470,10 485,10 C500,10 505,50 520,50 C535,50 540,30 555,30 L600,30"
-          fill="none" stroke="url(#waveGrad)" strokeWidth="2"
-          style={{ animation: active ? "pulseTravel 1.4s linear infinite" : "pulseTravelSlow 6s linear infinite" }} />
-      </svg>
-    </div>
-  );
-}
-
-function ConfidenceMeter({ score }) {
-  const filled = Math.max(0, Math.min(5, Math.round((score || 0) / 20)));
-  let label = "Low", color = COLORS.rose;
-  if (score >= 70) { label = "High"; color = COLORS.green; }
-  else if (score >= 40) { label = "Medium"; color = COLORS.amber; }
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ display: "flex", gap: 3, alignItems: "flex-end" }}>
-        {[1,2,3,4,5].map(i => (
-          <div key={i} style={{ width: 6, height: 8 + i * 4, borderRadius: 2, background: i <= filled ? color : "rgba(255,255,255,0.08)", transition: "background 0.4s ease" }} />
-        ))}
-      </div>
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color, letterSpacing: 0.3 }}>
-        {score}% · {label} confidence
-      </span>
-    </div>
-  );
-}
-
-const LOADING_MESSAGES = [
-  "Scanning public business listings…",
-  "Cross-referencing domain & directories…",
-  "Reading practice websites & socials…",
-  "Assembling persona card…",
-  "Drafting outreach angle…",
-];
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -87,312 +53,370 @@ Then draft ONE personalized cold outreach email pitching MagnaWave PEMF devices,
 
 If little or no public information can be found for this specific lead, do NOT stall — fall back to a reasonable persona inferred from the email domain name and general industry norms for equine/wellness practices, set "isFallback": true, and still write a relevant, useful email addressed generically to the practice.
 
-Respond with ONLY a single valid JSON object — no markdown formatting, no code fences, no commentary before or after. Match this exact schema:
-
+Respond with ONLY a single valid JSON object — no markdown, no code fences, no commentary. Schema:
 {
   "persona": {
-    "name": "string, contact or owner name, or empty string if unknown",
-    "role": "string, e.g. Owner / Equine Massage Therapist",
-    "business": "string, business name",
-    "location": "string, City, ST",
-    "teamSize": "string, e.g. Solo practitioner / 2-5 staff / 6-15 staff / Unknown",
-    "industryTags": ["array", "of", "up to 4 short tags"],
-    "servicesOffered": ["array", "of", "up to 4 short services"],
-    "website": "string or empty string",
+    "name": "string or empty",
+    "role": "string",
+    "business": "string",
+    "location": "string City, ST",
+    "teamSize": "string",
+    "industryTags": ["up to 4 tags"],
+    "servicesOffered": ["up to 4 services"],
+    "website": "string or empty",
     "isFallback": boolean,
     "confidenceScore": integer 0-100,
-    "confidenceNotes": "one short sentence explaining the score",
+    "confidenceNotes": "one sentence",
     "sourceCount": integer
   },
   "email": {
-    "subject": "string, under 60 chars",
-    "body": "string, plain text, use \\n for line breaks, under 160 words, sign as 'The MagnaWave Team'"
+    "subject": "string under 60 chars",
+    "body": "plain text under 160 words, sign as The MagnaWave Team"
   }
 }`;
 
-function InfoRow({ icon, text }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#dbeafe" }}>
-      {icon}
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
-    </div>
-  );
+const LOADING_MSGS = [
+  "Scanning public business listings…",
+  "Cross-referencing domain & directories…",
+  "Reading practice websites & socials…",
+  "Assembling persona card…",
+  "Drafting outreach angle…",
+];
+
+let state = {
+  email: "", status: "idle", loadingIdx: 0,
+  persona: null, emailDraft: null, errorMsg: "", copied: false
+};
+let loadingTimer = null;
+
+function setState(patch) {
+  state = { ...state, ...patch };
+  render();
 }
 
-function btnStyle(accent, filled, outline) {
-  return {
-    display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, fontWeight: 600,
-    fontFamily: "'Space Grotesk', sans-serif", padding: "10px 16px", borderRadius: 10, cursor: "pointer",
-    background: filled ? accent : "transparent", color: filled ? "#04202f" : accent,
-    border: `1px solid ${outline ? "rgba(255,255,255,0.15)" : accent}`,
-    transition: "transform 0.15s ease",
-  };
+function el(tag, attrs, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === "class") e.className = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null || c === false) continue;
+    e.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return e;
 }
 
-function App() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("idle");
-  const [loadingIdx, setLoadingIdx] = useState(0);
-  const [persona, setPersona] = useState(null);
-  const [emailDraft, setEmailDraft] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [copied, setCopied] = useState(false);
-  const intervalRef = useRef(null);
+function svgEl(tag, attrs, ...children) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  for (const c of children) if (c) e.appendChild(c);
+  return e;
+}
 
-  useEffect(() => {
-    if (status === "loading") {
-      setLoadingIdx(0);
-      intervalRef.current = setInterval(() => setLoadingIdx(i => (i + 1) % LOADING_MESSAGES.length), 1400);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [status]);
+function icon(path, size = 16) {
+  const svg = svgEl("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", style: `flex-shrink:0` });
+  svg.innerHTML = path;
+  return svg;
+}
 
-  function extractJson(content) {
-    const textBlocks = (content || []).filter(b => b.type === "text").map(b => b.text);
-    const combined = textBlocks.join("\n");
-    const first = combined.indexOf("{");
-    const last = combined.lastIndexOf("}");
-    if (first === -1 || last === -1) throw new Error("No JSON object found in response.");
-    return JSON.parse(combined.slice(first, last + 1));
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  check: '<polyline points="20 6 9 11 4 16"/>',
+  alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  radio: '<circle cx="12" cy="12" r="2"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M7.76 7.76a6 6 0 0 0 0 8.49"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>',
+  mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  building: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  circle_check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+};
+
+function PulseWave(active) {
+  const wrap = el("div", { style: { width: "100%", height: "46px", overflow: "hidden" } });
+  const svg = svgEl("svg", { viewBox: "0 0 600 60", preserveAspectRatio: "none", style: "width:100%;height:100%;display:block" });
+  const defs = svgEl("defs");
+  const grad = svgEl("linearGradient", { id: "waveGrad", x1: "0", y1: "0", x2: "1", y2: "0" });
+  grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": COLORS.cyan, "stop-opacity": "0" }));
+  grad.appendChild(svgEl("stop", { offset: "15%", "stop-color": COLORS.cyan, "stop-opacity": "0.9" }));
+  grad.appendChild(svgEl("stop", { offset: "50%", "stop-color": COLORS.violet, "stop-opacity": "0.9" }));
+  grad.appendChild(svgEl("stop", { offset: "85%", "stop-color": COLORS.cyan, "stop-opacity": "0.9" }));
+  grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": COLORS.cyan, "stop-opacity": "0" }));
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+  const path = svgEl("path", {
+    d: "M0,30 C15,30 20,10 35,10 C50,10 55,50 70,50 C85,50 90,30 105,30 L150,30 C165,30 170,10 185,10 C200,10 205,50 220,50 C235,50 240,30 255,30 L300,30 C315,30 320,10 335,10 C350,10 355,50 370,50 C385,50 390,30 405,30 L450,30 C465,30 470,10 485,10 C500,10 505,50 520,50 C535,50 540,30 555,30 L600,30",
+    fill: "none", stroke: "url(#waveGrad)", "stroke-width": "2",
+    style: active ? "animation:pulseTravel 1.4s linear infinite" : "animation:pulseTravelSlow 6s linear infinite"
+  });
+  svg.appendChild(path);
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+function ConfidenceMeter(score) {
+  const filled = Math.max(0, Math.min(5, Math.round((score || 0) / 20)));
+  let label = "Low", color = COLORS.rose;
+  if (score >= 70) { label = "High"; color = COLORS.green; }
+  else if (score >= 40) { label = "Medium"; color = COLORS.amber; }
+  const wrap = el("div", { style: { display: "flex", alignItems: "center", gap: "10px" } });
+  const bars = el("div", { style: { display: "flex", gap: "3px", alignItems: "flex-end" } });
+  for (let i = 1; i <= 5; i++) {
+    bars.appendChild(el("div", { style: { width: "6px", height: `${8 + i * 4}px`, borderRadius: "2px", background: i <= filled ? color : "rgba(255,255,255,0.08)" } }));
   }
+  const lbl = el("span", { style: { fontFamily: "'JetBrains Mono', monospace", fontSize: "12px", color, letterSpacing: "0.3px" } }, `${score}% · ${label} confidence`);
+  wrap.appendChild(bars);
+  wrap.appendChild(lbl);
+  return wrap;
+}
 
-  async function runGeneration(isRegenerate) {
-    const trimmed = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setErrorMsg("Enter a valid business email address to continue.");
-      setStatus("error");
-      return;
-    }
-    setStatus("loading");
-    setErrorMsg("");
-    try {
-      const userMsg = isRegenerate
-        ? `Lead email: ${trimmed}\n\nGenerate a fresh alternate version of the outreach email with a different opening hook and angle.`
-        : `Lead email: ${trimmed}`;
+function InfoRow(iconPath, text) {
+  const wrap = el("div", { style: { display: "flex", alignItems: "center", gap: "8px", color: "#dbeafe", fontSize: "13.5px" } });
+  const ic = icon(iconPath, 15);
+  ic.style.color = COLORS.textFaint;
+  ic.style.flexShrink = "0";
+  wrap.appendChild(ic);
+  wrap.appendChild(el("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, text));
+  return wrap;
+}
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 1000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userMsg }],
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
-        }),
-      });
+function mkBtn(label, iconPath, accent, filled, onclick) {
+  const btn = el("button", {
+    class: "mw-btn",
+    style: {
+      display: "flex", alignItems: "center", gap: "7px", fontSize: "13.5px", fontWeight: "600",
+      padding: "10px 16px", borderRadius: "10px", background: filled ? accent : "transparent",
+      color: filled ? "#04202f" : accent, border: `1px solid ${filled ? accent : "rgba(255,255,255,0.2)"}`,
+    },
+    onClick: onclick
+  });
+  if (iconPath) { const ic = icon(iconPath, 15); ic.style.color = filled ? "#04202f" : accent; btn.appendChild(ic); }
+  btn.appendChild(document.createTextNode(label));
+  return btn;
+}
 
-      if (!response.ok) throw new Error(`Request failed (${response.status})`);
-      const data = await response.json();
-      const parsed = extractJson(data.content);
-      if (!parsed.persona || !parsed.email) throw new Error("Response missing persona or email data.");
-      setPersona(parsed.persona);
-      setEmailDraft(parsed.email);
-      setStatus("success");
-    } catch (err) {
-      setErrorMsg(err.message === "Failed to fetch"
-        ? "Network error — check your connection and try again."
-        : `Couldn't generate this lead (${err.message}). Try again.`);
-      setStatus("error");
-    }
+function extractJson(content) {
+  const text = (content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+  const first = text.indexOf("{"), last = text.lastIndexOf("}");
+  if (first === -1 || last === -1) throw new Error("No JSON found in response.");
+  return JSON.parse(text.slice(first, last + 1));
+}
+
+async function runGeneration(isRegenerate) {
+  const trimmed = state.email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    setState({ status: "error", errorMsg: "Enter a valid business email address to continue." });
+    return;
   }
+  setState({ status: "loading", errorMsg: "", loadingIdx: 0 });
+  clearInterval(loadingTimer);
+  loadingTimer = setInterval(() => setState({ loadingIdx: (state.loadingIdx + 1) % LOADING_MSGS.length }), 1400);
 
-  function handleCopy() {
-    if (!emailDraft) return;
-    navigator.clipboard.writeText(`Subject: ${emailDraft.subject}\n\n${emailDraft.body}`).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+  try {
+    const userMsg = isRegenerate
+      ? `Lead email: ${trimmed}\n\nGenerate a fresh alternate version with a different opening hook.`
+      : `Lead email: ${trimmed}`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL, max_tokens: 1000, system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMsg }],
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+      }),
     });
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const data = await res.json();
+    const parsed = extractJson(data.content);
+    if (!parsed.persona || !parsed.email) throw new Error("Missing persona or email data.");
+    clearInterval(loadingTimer);
+    setState({ status: "success", persona: parsed.persona, emailDraft: parsed.email });
+  } catch (err) {
+    clearInterval(loadingTimer);
+    setState({ status: "error", errorMsg: err.message === "Failed to fetch" ? "Network error — check connection." : `Error: ${err.message}` });
+  }
+}
+
+function handleCopy() {
+  if (!state.emailDraft) return;
+  navigator.clipboard.writeText(`Subject: ${state.emailDraft.subject}\n\n${state.emailDraft.body}`).then(() => {
+    setState({ copied: true });
+    setTimeout(() => setState({ copied: false }), 1800);
+  });
+}
+
+function handleExport() {
+  const { persona, emailDraft, email } = state;
+  if (!persona || !emailDraft) return;
+  const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const headers = ["email_input","name","role","business","location","team_size","tags","services","website","is_fallback","confidence","notes","sources","subject","body"];
+  const row = [email, persona.name, persona.role, persona.business, persona.location, persona.teamSize,
+    (persona.industryTags||[]).join("; "), (persona.servicesOffered||[]).join("; "), persona.website,
+    persona.isFallback, persona.confidenceScore, persona.confidenceNotes, persona.sourceCount,
+    emailDraft.subject, emailDraft.body];
+  const csv = headers.map(esc).join(",") + "\n" + row.map(esc).join(",");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `magnawave-${(persona.business||"lead").toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,30)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function render() {
+  const { email, status, loadingIdx, persona, emailDraft, errorMsg, copied } = state;
+  const root = document.getElementById("root");
+  root.innerHTML = "";
+
+  const wrap = el("div", { style: { maxWidth: "980px", margin: "0 auto", padding: "40px 24px 64px" } });
+
+  // Header
+  const hdr = el("div", {});
+  hdr.appendChild(el("div", { style: { fontFamily: "'JetBrains Mono',monospace", fontSize: "11px", letterSpacing: "2px", color: COLORS.textFaint, textTransform: "uppercase", marginBottom: "6px" } }, "Equinox Agents · Internal Tool"));
+  const h1 = el("h1", { style: { fontFamily: "'Space Grotesk',sans-serif", fontWeight: "700", fontSize: "30px", display: "flex", alignItems: "center", gap: "10px", color: COLORS.text } });
+  const radioIc = icon(ICONS.radio, 26); radioIc.style.color = COLORS.cyan;
+  h1.appendChild(radioIc);
+  h1.appendChild(document.createTextNode("MagnaWave Lead Enrichment"));
+  hdr.appendChild(h1);
+  hdr.appendChild(el("p", { style: { marginTop: "6px", color: COLORS.textDim, fontSize: "14.5px" } }, "Turn a lead's email into a persona and a ready-to-send PEMF outreach draft."));
+  wrap.appendChild(hdr);
+
+  // Pulse wave
+  const pwWrap = el("div", { style: { marginTop: "22px", marginBottom: "6px" } });
+  pwWrap.appendChild(PulseWave(status === "loading"));
+  wrap.appendChild(pwWrap);
+
+  // Input row
+  const inputBox = el("div", { style: { display: "flex", gap: "10px", flexWrap: "wrap", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: "14px", padding: "12px" } });
+  const inputWrap = el("div", { style: { position: "relative", flex: "1 1 260px" } });
+  const mailIc = icon(ICONS.mail, 16); mailIc.style.cssText = `position:absolute;left:14px;top:50%;transform:translateY(-50%);color:${COLORS.textFaint}`;
+  const inp = el("input", { type: "email", placeholder: "lead@equinevetclinic.com", value: email, style: { width: "100%", background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: "10px", padding: "12px 14px 12px 40px", color: COLORS.text, fontSize: "14.5px" }, onInput: e => { state.email = e.target.value; }, onKeydown: e => { if (e.key === "Enter") runGeneration(false); } });
+  inputWrap.appendChild(mailIc);
+  inputWrap.appendChild(inp);
+  inputBox.appendChild(inputWrap);
+
+  const searchBtn = el("button", {
+    class: "mw-btn",
+    style: { display: "flex", alignItems: "center", gap: "8px", background: status === "loading" ? "rgba(56,189,248,0.25)" : COLORS.cyan, color: status === "loading" ? COLORS.cyanSoft : "#04202f", border: "none", borderRadius: "10px", padding: "0 20px", fontWeight: "600", fontSize: "14.5px", cursor: status === "loading" ? "default" : "pointer" },
+    onClick: () => { if (status !== "loading") runGeneration(false); }
+  });
+  const searchIc = icon(ICONS.search, 16); searchIc.style.color = status === "loading" ? COLORS.cyanSoft : "#04202f";
+  searchBtn.appendChild(searchIc);
+  searchBtn.appendChild(document.createTextNode(status === "loading" ? "Researching…" : "Research & Generate"));
+  inputBox.appendChild(searchBtn);
+  wrap.appendChild(inputBox);
+
+  // Loading
+  if (status === "loading") {
+    const ld = el("div", { class: "mw-fade", style: { marginTop: "18px", display: "flex", alignItems: "center", gap: "10px", color: COLORS.textDim, fontSize: "14px" } });
+    ld.appendChild(el("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: COLORS.cyan, display: "inline-block", boxShadow: `0 0 12px ${COLORS.cyan}` } }));
+    ld.appendChild(document.createTextNode(LOADING_MSGS[loadingIdx]));
+    wrap.appendChild(ld);
   }
 
-  function handleExport() {
-    if (!persona || !emailDraft) return;
-    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const headers = ["email_input","contact_name","role","business","location","team_size","industry_tags","services_offered","website","is_fallback","confidence_score","confidence_notes","source_count","email_subject","email_body"];
-    const row = [email.trim(), persona.name, persona.role, persona.business, persona.location, persona.teamSize, (persona.industryTags||[]).join("; "), (persona.servicesOffered||[]).join("; "), persona.website, persona.isFallback?"true":"false", persona.confidenceScore, persona.confidenceNotes, persona.sourceCount, emailDraft.subject, emailDraft.body];
-    const csv = headers.map(esc).join(",") + "\n" + row.map(esc).join(",");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `magnawave-lead-${(persona.business||"lead").toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Error
+  if (status === "error") {
+    const err = el("div", { class: "mw-fade", style: { marginTop: "18px", display: "flex", alignItems: "flex-start", gap: "10px", background: "rgba(251,113,133,0.08)", border: "1px solid rgba(251,113,133,0.3)", borderRadius: "12px", padding: "14px 16px", fontSize: "14px" } });
+    const alertIc = icon(ICONS.alert, 18); alertIc.style.color = COLORS.rose; alertIc.style.flexShrink = "0";
+    err.appendChild(alertIc);
+    const errText = el("div", {});
+    errText.appendChild(el("div", { style: { fontWeight: "600", marginBottom: "2px", color: "#fecdd3" } }, "Couldn't complete this lookup"));
+    errText.appendChild(el("div", { style: { color: "#f3b9c2" } }, errorMsg));
+    err.appendChild(errText);
+    wrap.appendChild(err);
   }
 
-  const hasResult = status === "success" && persona && emailDraft;
+  // Results
+  if (status === "success" && persona && emailDraft) {
+    const grid = el("div", { class: "mw-fade", style: { marginTop: "26px", display: "grid", gridTemplateColumns: "minmax(260px,340px) 1fr", gap: "20px" } });
 
-  return (
-    <div style={{ minHeight: "100vh", width: "100%", background: `radial-gradient(1200px 500px at 20% -10%, ${COLORS.panel}, transparent), ${COLORS.bg}`, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>
-      <style>{`
-        @keyframes pulseTravel { 0% { stroke-dasharray: 40 900; stroke-dashoffset: 940; } 100% { stroke-dasharray: 40 900; stroke-dashoffset: 0; } }
-        @keyframes pulseTravelSlow { 0% { stroke-dasharray: 60 900; stroke-dashoffset: 960; } 100% { stroke-dasharray: 60 900; stroke-dashoffset: 0; } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .mw-fade { animation: fadeUp 0.35s ease both; }
-        .mw-btn:hover { transform: translateY(-1px); }
-        .mw-btn:active { transform: translateY(0); }
-      `}</style>
+    // Persona card
+    const pc = el("div", { style: { background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: "16px", padding: "20px", minWidth: "0" } });
+    const pcTop = el("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" } });
+    pcTop.appendChild(el("div", { style: { fontFamily: "'JetBrains Mono',monospace", fontSize: "10.5px", letterSpacing: "1.5px", color: COLORS.textFaint, textTransform: "uppercase" } }, "Persona"));
+    if (persona.isFallback) pcTop.appendChild(el("span", { style: { fontSize: "10.5px", fontFamily: "'JetBrains Mono',monospace", color: COLORS.amber, background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: "999px", padding: "2px 8px" } }, "Industry estimate"));
+    pc.appendChild(pcTop);
+    pc.appendChild(el("h2", { style: { fontFamily: "'Space Grotesk',sans-serif", fontSize: "20px", margin: "2px 0 2px", color: COLORS.text } }, persona.name || "Contact name unknown"));
+    pc.appendChild(el("div", { style: { color: COLORS.cyanSoft, fontSize: "13.5px", marginBottom: "14px" } }, persona.role || "Role unknown"));
 
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 24px 64px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: 2, color: COLORS.textFaint, textTransform: "uppercase", marginBottom: 6 }}>
-              Equinox Agents · Internal Tool
-            </div>
-            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, margin: 0, display: "flex", alignItems: "center", gap: 10, color: COLORS.text }}>
-              <Radio size={26} color={COLORS.cyan} strokeWidth={2.2} />
-              MagnaWave Lead Enrichment
-            </h1>
-            <p style={{ margin: "6px 0 0", color: COLORS.textDim, fontSize: 14.5 }}>
-              Turn a lead's email into a persona and a ready-to-send PEMF outreach draft.
-            </p>
-          </div>
-        </div>
+    const fields = el("div", { style: { display: "flex", flexDirection: "column", gap: "10px" } });
+    fields.appendChild(InfoRow(ICONS.building, persona.business || "Unknown business"));
+    fields.appendChild(InfoRow(ICONS.pin, persona.location || "Location unknown"));
+    fields.appendChild(InfoRow(ICONS.users, persona.teamSize || "Team size unknown"));
+    if (persona.website) fields.appendChild(InfoRow(ICONS.globe, persona.website));
+    pc.appendChild(fields);
 
-        <div style={{ marginTop: 22, marginBottom: 6 }}>
-          <PulseWave active={status === "loading"} />
-        </div>
+    if ((persona.industryTags || []).length > 0) {
+      const tags = el("div", { style: { marginTop: "14px", display: "flex", flexWrap: "wrap", gap: "6px" } });
+      persona.industryTags.forEach(tag => {
+        const t = el("span", { style: { fontSize: "11.5px", color: COLORS.cyanSoft, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: "999px", padding: "3px 9px", display: "flex", alignItems: "center", gap: "4px" } });
+        const tic = icon(ICONS.tag, 10); tic.style.color = COLORS.cyanSoft;
+        t.appendChild(tic);
+        t.appendChild(document.createTextNode(tag));
+        tags.appendChild(t);
+      });
+      pc.appendChild(tags);
+    }
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 14, padding: 12 }}>
-          <div style={{ position: "relative", flex: "1 1 260px" }}>
-            <Mail size={16} color={COLORS.textFaint} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              type="email" value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") runGeneration(false); }}
-              placeholder="lead@equinevetclinic.com"
-              style={{ width: "100%", boxSizing: "border-box", background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 10, padding: "12px 14px 12px 40px", color: COLORS.text, fontSize: 14.5, fontFamily: "'Inter', sans-serif" }}
-            />
-          </div>
-          <button className="mw-btn" onClick={() => runGeneration(false)} disabled={status === "loading"}
-            style={{ display: "flex", alignItems: "center", gap: 8, background: status === "loading" ? "rgba(56,189,248,0.25)" : COLORS.cyan, color: status === "loading" ? COLORS.cyanSoft : "#04202f", border: "none", borderRadius: 10, padding: "0 20px", fontWeight: 600, fontSize: 14.5, cursor: status === "loading" ? "default" : "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>
-            <Search size={16} />
-            {status === "loading" ? "Researching…" : "Research & Generate"}
-          </button>
-        </div>
+    if ((persona.servicesOffered || []).length > 0) {
+      const sv = el("div", { style: { marginTop: "14px" } });
+      sv.appendChild(el("div", { style: { fontSize: "11px", color: COLORS.textFaint, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "1px" } }, "Services"));
+      const ul = el("ul", { style: { color: COLORS.textDim, fontSize: "13px", lineHeight: "1.6" } });
+      persona.servicesOffered.forEach(s => ul.appendChild(el("li", {}, s)));
+      sv.appendChild(ul);
+      pc.appendChild(sv);
+    }
 
-        {status === "loading" && (
-          <div className="mw-fade" style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10, color: COLORS.textDim, fontSize: 14 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.cyan, display: "inline-block", boxShadow: `0 0 12px ${COLORS.cyan}` }} />
-            {LOADING_MESSAGES[loadingIdx]}
-          </div>
-        )}
+    const conf = el("div", { style: { marginTop: "18px", paddingTop: "16px", borderTop: `1px solid ${COLORS.panelBorder}` } });
+    conf.appendChild(ConfidenceMeter(persona.confidenceScore));
+    conf.appendChild(el("div", { style: { fontSize: "12px", color: COLORS.textFaint, marginTop: "8px", lineHeight: "1.5" } }, `${persona.confidenceNotes}${typeof persona.sourceCount === "number" ? ` · ${persona.sourceCount} source${persona.sourceCount === 1 ? "" : "s"}` : ""}`));
+    pc.appendChild(conf);
+    grid.appendChild(pc);
 
-        {status === "error" && (
-          <div className="mw-fade" style={{ marginTop: 18, display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(251,113,133,0.08)", border: "1px solid rgba(251,113,133,0.3)", borderRadius: 12, padding: "14px 16px", color: "#fecdd3", fontSize: 14 }}>
-            <AlertTriangle size={18} color={COLORS.rose} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <div style={{ fontWeight: 600, marginBottom: 2 }}>Couldn't complete this lookup</div>
-              <div style={{ color: "#f3b9c2" }}>{errorMsg}</div>
-            </div>
-          </div>
-        )}
+    // Email card
+    const ec = el("div", { style: { background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", minWidth: "0" } });
+    ec.appendChild(el("div", { style: { fontFamily: "'JetBrains Mono',monospace", fontSize: "10.5px", letterSpacing: "1.5px", color: COLORS.textFaint, textTransform: "uppercase", marginBottom: "10px" } }, "Outreach Draft"));
+    const emailBody = el("div", { style: { background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: "12px", padding: "18px", flex: "1" } });
+    emailBody.appendChild(el("div", { style: { fontSize: "12px", color: COLORS.textFaint, marginBottom: "4px" } }, "Subject"));
+    emailBody.appendChild(el("div", { style: { fontFamily: "'Space Grotesk',sans-serif", fontSize: "16.5px", color: COLORS.text, marginBottom: "16px" } }, emailDraft.subject));
+    emailBody.appendChild(el("div", { style: { fontSize: "12px", color: COLORS.textFaint, marginBottom: "6px" } }, "Body"));
+    emailBody.appendChild(el("div", { style: { whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: "1.7", color: COLORS.textDim } }, emailDraft.body));
+    ec.appendChild(emailBody);
 
-        {hasResult && (
-          <div className="mw-fade" style={{ marginTop: 26, display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: 20 }}>
-            <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 16, padding: 20, minWidth: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: 1.5, color: COLORS.textFaint, textTransform: "uppercase" }}>Persona</div>
-                {persona.isFallback && (
-                  <span style={{ fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", color: COLORS.amber, background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 999, padding: "2px 8px" }}>Industry estimate</span>
-                )}
-              </div>
-              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "2px 0 2px", color: COLORS.text }}>{persona.name || "Contact name unknown"}</h2>
-              <div style={{ color: COLORS.cyanSoft, fontSize: 13.5, marginBottom: 14 }}>{persona.role || "Role unknown"}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5 }}>
-                <InfoRow icon={<Building2 size={15} color={COLORS.textFaint} />} text={persona.business || "Unknown business"} />
-                <InfoRow icon={<MapPin size={15} color={COLORS.textFaint} />} text={persona.location || "Location unknown"} />
-                <InfoRow icon={<Users size={15} color={COLORS.textFaint} />} text={persona.teamSize || "Team size unknown"} />
-                {persona.website && <InfoRow icon={<Globe size={15} color={COLORS.textFaint} />} text={persona.website} />}
-              </div>
-              {(persona.industryTags || []).length > 0 && (
-                <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {persona.industryTags.map((tag, i) => (
-                    <span key={i} style={{ fontSize: 11.5, color: COLORS.cyanSoft, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: 999, padding: "3px 9px", display: "flex", alignItems: "center", gap: 4 }}>
-                      <Tag size={10} /> {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {(persona.servicesOffered || []).length > 0 && (
-                <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 11, color: COLORS.textFaint, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Services</div>
-                  <ul style={{ margin: 0, paddingLeft: 18, color: COLORS.textDim, fontSize: 13, lineHeight: 1.6 }}>
-                    {persona.servicesOffered.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-              )}
-              <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${COLORS.panelBorder}` }}>
-                <ConfidenceMeter score={persona.confidenceScore} />
-                <div style={{ fontSize: 12, color: COLORS.textFaint, marginTop: 8, lineHeight: 1.5 }}>
-                  {persona.confidenceNotes}{typeof persona.sourceCount === "number" ? ` · ${persona.sourceCount} source${persona.sourceCount === 1 ? "" : "s"}` : ""}
-                </div>
-              </div>
-            </div>
+    const btns = el("div", { style: { display: "flex", gap: "10px", marginTop: "16px", flexWrap: "wrap" } });
+    btns.appendChild(mkBtn(copied ? "Copied" : "Copy email", copied ? ICONS.check : ICONS.copy, copied ? COLORS.green : COLORS.cyan, copied, handleCopy));
+    btns.appendChild(mkBtn("Regenerate", ICONS.refresh, COLORS.violet, false, () => runGeneration(true)));
+    btns.appendChild(mkBtn("Export CSV", ICONS.download, COLORS.textDim, false, handleExport));
+    ec.appendChild(btns);
+    grid.appendChild(ec);
+    wrap.appendChild(grid);
+  }
 
-            <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", minWidth: 0 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: 1.5, color: COLORS.textFaint, textTransform: "uppercase", marginBottom: 10 }}>Outreach Draft</div>
-              <div style={{ background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 12, padding: 18, flex: 1 }}>
-                <div style={{ fontSize: 12, color: COLORS.textFaint, marginBottom: 4 }}>Subject</div>
-                <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16.5, color: COLORS.text, marginBottom: 16 }}>{emailDraft.subject}</div>
-                <div style={{ fontSize: 12, color: COLORS.textFaint, marginBottom: 6 }}>Body</div>
-                <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.7, color: COLORS.textDim }}>{emailDraft.body}</div>
-              </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-                <button className="mw-btn" onClick={handleCopy} style={btnStyle(copied ? COLORS.green : COLORS.cyan, copied)}>
-                  {copied ? <Check size={15} /> : <Copy size={15} />}
-                  {copied ? "Copied" : "Copy email"}
-                </button>
-                <button className="mw-btn" onClick={() => runGeneration(true)} disabled={status === "loading"} style={btnStyle(COLORS.violet, false, true)}>
-                  <RefreshCw size={15} /> Regenerate
-                </button>
-                <button className="mw-btn" onClick={handleExport} style={btnStyle(COLORS.textDim, false, true)}>
-                  <Download size={15} /> Export CSV
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+  // Idle
+  if (status === "idle") {
+    const idle = el("div", { style: { marginTop: "40px", textAlign: "center", color: COLORS.textFaint, fontSize: "13.5px" } });
+    const cic = icon(ICONS.circle_check, 20); cic.style.cssText = `color:${COLORS.textFaint};display:block;margin:0 auto 8px`;
+    idle.appendChild(cic);
+    idle.appendChild(document.createTextNode("Enter a lead's business email above to research their practice and draft outreach."));
+    wrap.appendChild(idle);
+  }
 
-        {status === "idle" && (
-          <div style={{ marginTop: 40, textAlign: "center", color: COLORS.textFaint, fontSize: 13.5 }}>
-            <CheckCircle2 size={20} color={COLORS.textFaint} style={{ marginBottom: 8 }} />
-            <div>Enter a lead's business email above to research their practice and draft outreach.</div>
-          </div>
-        )}
+  // Footer
+  wrap.appendChild(el("div", { style: { marginTop: "48px", borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: "16px", fontSize: "11.5px", color: COLORS.textFaint } }, "Internal Equinox Agents tool for MagnaWave outbound. Research draws only on publicly available web data — verify details and personalize before sending."));
 
-        <div style={{ marginTop: 48, borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 16, fontSize: 11.5, color: COLORS.textFaint }}>
-          Internal Equinox Agents tool for MagnaWave outbound. Research draws only on publicly available web data — verify details and personalize before sending.
-        </div>
-      </div>
-    </div>
-  );
+  root.appendChild(wrap);
 }
 
-function InfoRow({ icon, text }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#dbeafe" }}>
-      {icon}
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
-    </div>
-  );
-}
-
-function btnStyle(accent, filled, outline) {
-  return {
-    display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, fontWeight: 600,
-    fontFamily: "'Space Grotesk', sans-serif", padding: "10px 16px", borderRadius: 10, cursor: "pointer",
-    background: filled ? accent : "transparent", color: filled ? "#04202f" : accent,
-    border: `1px solid ${outline ? "rgba(255,255,255,0.15)" : accent}`,
-    transition: "transform 0.15s ease",
-  };
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+render();
 </script>
 </body>
 </html>
