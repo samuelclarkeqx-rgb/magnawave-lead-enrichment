@@ -224,7 +224,7 @@ async function runGeneration(isRegenerate) {
       ? `Lead email: ${trimmed}\n\nGenerate a fresh alternate version with a different opening hook.`
       : `Lead email: ${trimmed}`;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://magnawave-proxy.samuelclark-eqx.workers.dev/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
