@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MagnaWave Lead Enrichment</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide-react@0.383.0/dist/umd/lucide-react.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f2a4a; }
+  input { outline: none; }
+  input::placeholder { color: #5f80a3; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const { Search, Copy, RefreshCw, Download, CheckCircle2, AlertTriangle, Radio, Building2, MapPin, Users, Globe, Tag, Mail, Check } = LucideReact;
+
+const COLORS = {
+  bg: "#0f2a4a", bgDeep: "#0a1f38", panel: "#123458", panelBorder: "#1e4a76",
+  cyan: "#38bdf8", cyanSoft: "#7dd3fc", violet: "#a78bfa", text: "#eaf3fb",
+  textDim: "#93b3d1", textFaint: "#5f80a3", amber: "#fbbf24", rose: "#fb7185", green: "#4ade80",
+};
+
+function PulseWave({ active = false, height = 46 }) {
+  return (
+    <div style={{ width: "100%", height, overflow: "hidden", position: "relative" }}>
+      <svg viewBox="0 0 600 60" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
+        <defs>
+          <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={COLORS.cyan} stopOpacity="0" />
+            <stop offset="15%" stopColor={COLORS.cyan} stopOpacity="0.9" />
+            <stop offset="50%" stopColor={COLORS.violet} stopOpacity="0.9" />
+            <stop offset="85%" stopColor={COLORS.cyan} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={COLORS.cyan} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="M0,30 C15,30 20,10 35,10 C50,10 55,50 70,50 C85,50 90,30 105,30 L150,30 C165,30 170,10 185,10 C200,10 205,50 220,50 C235,50 240,30 255,30 L300,30 C315,30 320,10 335,10 C350,10 355,50 370,50 C385,50 390,30 405,30 L450,30 C465,30 470,10 485,10 C500,10 505,50 520,50 C535,50 540,30 555,30 L600,30"
+          fill="none" stroke="url(#waveGrad)" strokeWidth="2"
+          style={{ animation: active ? "pulseTravel 1.4s linear infinite" : "pulseTravelSlow 6s linear infinite" }} />
+      </svg>
+    </div>
+  );
+}
+
+function ConfidenceMeter({ score }) {
+  const filled = Math.max(0, Math.min(5, Math.round((score || 0) / 20)));
+  let label = "Low", color = COLORS.rose;
+  if (score >= 70) { label = "High"; color = COLORS.green; }
+  else if (score >= 40) { label = "Medium"; color = COLORS.amber; }
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", gap: 3, alignItems: "flex-end" }}>
+        {[1,2,3,4,5].map(i => (
+          <div key={i} style={{ width: 6, height: 8 + i * 4, borderRadius: 2, background: i <= filled ? color : "rgba(255,255,255,0.08)", transition: "background 0.4s ease" }} />
+        ))}
+      </div>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color, letterSpacing: 0.3 }}>
+        {score}% · {label} confidence
+      </span>
+    </div>
+  );
+}
+
+const LOADING_MESSAGES = [
+  "Scanning public business listings…",
+  "Cross-referencing domain & directories…",
+  "Reading practice websites & socials…",
+  "Assembling persona card…",
+  "Drafting outreach angle…",
+];
+
+const MODEL = "claude-sonnet-4-6";
+
+const SYSTEM_PROMPT = `You are a B2B lead-research assistant for MagnaWave, a company that sells PEMF (Pulsed Electromagnetic Field) therapy devices to equine and wellness practitioners across the US (target customers include equine therapists, wellness practitioners, chiropractors, massage therapists, and horse trainers). Key product benefits: faster muscle recovery, reduced inflammation, improved performance.
+
+Given a business email address, use the web_search tool to find publicly available professional information tied to that email's domain/business: business name, owner or primary contact name, location (city, state), services offered, approximate team size, website, and social presence. Only use publicly available information; never fabricate specifics.
+
+Then draft ONE personalized cold outreach email pitching MagnaWave PEMF devices, tailored to what you found. Tone: warm, professional, not pushy. Keep the email body under 160 words, plain text, no markdown.
+
+If little or no public information can be found for this specific lead, do NOT stall — fall back to a reasonable persona inferred from the email domain name and general industry norms for equine/wellness practices, set "isFallback": true, and still write a relevant, useful email addressed generically to the practice.
+
+Respond with ONLY a single valid JSON object — no markdown formatting, no code fences, no commentary before or after. Match this exact schema:
+
+{
+  "persona": {
+    "name": "string, contact or owner name, or empty string if unknown",
+    "role": "string, e.g. Owner / Equine Massage Therapist",
+    "business": "string, business name",
+    "location": "string, City, ST",
+    "teamSize": "string, e.g. Solo practitioner / 2-5 staff / 6-15 staff / Unknown",
+    "industryTags": ["array", "of", "up to 4 short tags"],
+    "servicesOffered": ["array", "of", "up to 4 short services"],
+    "website": "string or empty string",
+    "isFallback": boolean,
+    "confidenceScore": integer 0-100,
+    "confidenceNotes": "one short sentence explaining the score",
+    "sourceCount": integer
+  },
+  "email": {
+    "subject": "string, under 60 chars",
+    "body": "string, plain text, use \\n for line breaks, under 160 words, sign as 'The MagnaWave Team'"
+  }
+}`;
+
+function InfoRow({ icon, text }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#dbeafe" }}>
+      {icon}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+    </div>
+  );
+}
+
+function btnStyle(accent, filled, outline) {
+  return {
+    display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, fontWeight: 600,
+    fontFamily: "'Space Grotesk', sans-serif", padding: "10px 16px", borderRadius: 10, cursor: "pointer",
+    background: filled ? accent : "transparent", color: filled ? "#04202f" : accent,
+    border: `1px solid ${outline ? "rgba(255,255,255,0.15)" : accent}`,
+    transition: "transform 0.15s ease",
+  };
+}
+
+function App() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [loadingIdx, setLoadingIdx] = useState(0);
+  const [persona, setPersona] = useState(null);
+  const [emailDraft, setEmailDraft] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [copied, setCopied] = useState(false);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (status === "loading") {
+      setLoadingIdx(0);
+      intervalRef.current = setInterval(() => setLoadingIdx(i => (i + 1) % LOADING_MESSAGES.length), 1400);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [status]);
+
+  function extractJson(content) {
+    const textBlocks = (content || []).filter(b => b.type === "text").map(b => b.text);
+    const combined = textBlocks.join("\n");
+    const first = combined.indexOf("{");
+    const last = combined.lastIndexOf("}");
+    if (first === -1 || last === -1) throw new Error("No JSON object found in response.");
+    return JSON.parse(combined.slice(first, last + 1));
+  }
+
+  async function runGeneration(isRegenerate) {
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setErrorMsg("Enter a valid business email address to continue.");
+      setStatus("error");
+      return;
+    }
+    setStatus("loading");
+    setErrorMsg("");
+    try {
+      const userMsg = isRegenerate
+        ? `Lead email: ${trimmed}\n\nGenerate a fresh alternate version of the outreach email with a different opening hook and angle.`
+        : `Lead email: ${trimmed}`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 1000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userMsg }],
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
+      const data = await response.json();
+      const parsed = extractJson(data.content);
+      if (!parsed.persona || !parsed.email) throw new Error("Response missing persona or email data.");
+      setPersona(parsed.persona);
+      setEmailDraft(parsed.email);
+      setStatus("success");
+    } catch (err) {
+      setErrorMsg(err.message === "Failed to fetch"
+        ? "Network error — check your connection and try again."
+        : `Couldn't generate this lead (${err.message}). Try again.`);
+      setStatus("error");
+    }
+  }
+
+  function handleCopy() {
+    if (!emailDraft) return;
+    navigator.clipboard.writeText(`Subject: ${emailDraft.subject}\n\n${emailDraft.body}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+
+  function handleExport() {
+    if (!persona || !emailDraft) return;
+    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const headers = ["email_input","contact_name","role","business","location","team_size","industry_tags","services_offered","website","is_fallback","confidence_score","confidence_notes","source_count","email_subject","email_body"];
+    const row = [email.trim(), persona.name, persona.role, persona.business, persona.location, persona.teamSize, (persona.industryTags||[]).join("; "), (persona.servicesOffered||[]).join("; "), persona.website, persona.isFallback?"true":"false", persona.confidenceScore, persona.confidenceNotes, persona.sourceCount, emailDraft.subject, emailDraft.body];
+    const csv = headers.map(esc).join(",") + "\n" + row.map(esc).join(",");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `magnawave-lead-${(persona.business||"lead").toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const hasResult = status === "success" && persona && emailDraft;
+
+  return (
+    <div style={{ minHeight: "100vh", width: "100%", background: `radial-gradient(1200px 500px at 20% -10%, ${COLORS.panel}, transparent), ${COLORS.bg}`, color: COLORS.text, fontFamily: "'Inter', sans-serif" }}>
+      <style>{`
+        @keyframes pulseTravel { 0% { stroke-dasharray: 40 900; stroke-dashoffset: 940; } 100% { stroke-dasharray: 40 900; stroke-dashoffset: 0; } }
+        @keyframes pulseTravelSlow { 0% { stroke-dasharray: 60 900; stroke-dashoffset: 960; } 100% { stroke-dasharray: 60 900; stroke-dashoffset: 0; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .mw-fade { animation: fadeUp 0.35s ease both; }
+        .mw-btn:hover { transform: translateY(-1px); }
+        .mw-btn:active { transform: translateY(0); }
+      `}</style>
+
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 24px 64px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: 2, color: COLORS.textFaint, textTransform: "uppercase", marginBottom: 6 }}>
+              Equinox Agents · Internal Tool
+            </div>
+            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, margin: 0, display: "flex", alignItems: "center", gap: 10, color: COLORS.text }}>
+              <Radio size={26} color={COLORS.cyan} strokeWidth={2.2} />
+              MagnaWave Lead Enrichment
+            </h1>
+            <p style={{ margin: "6px 0 0", color: COLORS.textDim, fontSize: 14.5 }}>
+              Turn a lead's email into a persona and a ready-to-send PEMF outreach draft.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 22, marginBottom: 6 }}>
+          <PulseWave active={status === "loading"} />
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 14, padding: 12 }}>
+          <div style={{ position: "relative", flex: "1 1 260px" }}>
+            <Mail size={16} color={COLORS.textFaint} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="email" value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") runGeneration(false); }}
+              placeholder="lead@equinevetclinic.com"
+              style={{ width: "100%", boxSizing: "border-box", background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 10, padding: "12px 14px 12px 40px", color: COLORS.text, fontSize: 14.5, fontFamily: "'Inter', sans-serif" }}
+            />
+          </div>
+          <button className="mw-btn" onClick={() => runGeneration(false)} disabled={status === "loading"}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: status === "loading" ? "rgba(56,189,248,0.25)" : COLORS.cyan, color: status === "loading" ? COLORS.cyanSoft : "#04202f", border: "none", borderRadius: 10, padding: "0 20px", fontWeight: 600, fontSize: 14.5, cursor: status === "loading" ? "default" : "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>
+            <Search size={16} />
+            {status === "loading" ? "Researching…" : "Research & Generate"}
+          </button>
+        </div>
+
+        {status === "loading" && (
+          <div className="mw-fade" style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10, color: COLORS.textDim, fontSize: 14 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.cyan, display: "inline-block", boxShadow: `0 0 12px ${COLORS.cyan}` }} />
+            {LOADING_MESSAGES[loadingIdx]}
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="mw-fade" style={{ marginTop: 18, display: "flex", alignItems: "flex-start", gap: 10, background: "rgba(251,113,133,0.08)", border: "1px solid rgba(251,113,133,0.3)", borderRadius: 12, padding: "14px 16px", color: "#fecdd3", fontSize: 14 }}>
+            <AlertTriangle size={18} color={COLORS.rose} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>Couldn't complete this lookup</div>
+              <div style={{ color: "#f3b9c2" }}>{errorMsg}</div>
+            </div>
+          </div>
+        )}
+
+        {hasResult && (
+          <div className="mw-fade" style={{ marginTop: 26, display: "grid", gridTemplateColumns: "minmax(260px, 340px) 1fr", gap: 20 }}>
+            <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 16, padding: 20, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: 1.5, color: COLORS.textFaint, textTransform: "uppercase" }}>Persona</div>
+                {persona.isFallback && (
+                  <span style={{ fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", color: COLORS.amber, background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", borderRadius: 999, padding: "2px 8px" }}>Industry estimate</span>
+                )}
+              </div>
+              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, margin: "2px 0 2px", color: COLORS.text }}>{persona.name || "Contact name unknown"}</h2>
+              <div style={{ color: COLORS.cyanSoft, fontSize: 13.5, marginBottom: 14 }}>{persona.role || "Role unknown"}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5 }}>
+                <InfoRow icon={<Building2 size={15} color={COLORS.textFaint} />} text={persona.business || "Unknown business"} />
+                <InfoRow icon={<MapPin size={15} color={COLORS.textFaint} />} text={persona.location || "Location unknown"} />
+                <InfoRow icon={<Users size={15} color={COLORS.textFaint} />} text={persona.teamSize || "Team size unknown"} />
+                {persona.website && <InfoRow icon={<Globe size={15} color={COLORS.textFaint} />} text={persona.website} />}
+              </div>
+              {(persona.industryTags || []).length > 0 && (
+                <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {persona.industryTags.map((tag, i) => (
+                    <span key={i} style={{ fontSize: 11.5, color: COLORS.cyanSoft, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: 999, padding: "3px 9px", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Tag size={10} /> {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(persona.servicesOffered || []).length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11, color: COLORS.textFaint, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Services</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, color: COLORS.textDim, fontSize: 13, lineHeight: 1.6 }}>
+                    {persona.servicesOffered.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${COLORS.panelBorder}` }}>
+                <ConfidenceMeter score={persona.confidenceScore} />
+                <div style={{ fontSize: 12, color: COLORS.textFaint, marginTop: 8, lineHeight: 1.5 }}>
+                  {persona.confidenceNotes}{typeof persona.sourceCount === "number" ? ` · ${persona.sourceCount} source${persona.sourceCount === 1 ? "" : "s"}` : ""}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, letterSpacing: 1.5, color: COLORS.textFaint, textTransform: "uppercase", marginBottom: 10 }}>Outreach Draft</div>
+              <div style={{ background: COLORS.bgDeep, border: `1px solid ${COLORS.panelBorder}`, borderRadius: 12, padding: 18, flex: 1 }}>
+                <div style={{ fontSize: 12, color: COLORS.textFaint, marginBottom: 4 }}>Subject</div>
+                <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16.5, color: COLORS.text, marginBottom: 16 }}>{emailDraft.subject}</div>
+                <div style={{ fontSize: 12, color: COLORS.textFaint, marginBottom: 6 }}>Body</div>
+                <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.7, color: COLORS.textDim }}>{emailDraft.body}</div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                <button className="mw-btn" onClick={handleCopy} style={btnStyle(copied ? COLORS.green : COLORS.cyan, copied)}>
+                  {copied ? <Check size={15} /> : <Copy size={15} />}
+                  {copied ? "Copied" : "Copy email"}
+                </button>
+                <button className="mw-btn" onClick={() => runGeneration(true)} disabled={status === "loading"} style={btnStyle(COLORS.violet, false, true)}>
+                  <RefreshCw size={15} /> Regenerate
+                </button>
+                <button className="mw-btn" onClick={handleExport} style={btnStyle(COLORS.textDim, false, true)}>
+                  <Download size={15} /> Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {status === "idle" && (
+          <div style={{ marginTop: 40, textAlign: "center", color: COLORS.textFaint, fontSize: 13.5 }}>
+            <CheckCircle2 size={20} color={COLORS.textFaint} style={{ marginBottom: 8 }} />
+            <div>Enter a lead's business email above to research their practice and draft outreach.</div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 48, borderTop: `1px solid ${COLORS.panelBorder}`, paddingTop: 16, fontSize: 11.5, color: COLORS.textFaint }}>
+          Internal Equinox Agents tool for MagnaWave outbound. Research draws only on publicly available web data — verify details and personalize before sending.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, text }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#dbeafe" }}>
+      {icon}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</span>
+    </div>
+  );
+}
+
+function btnStyle(accent, filled, outline) {
+  return {
+    display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, fontWeight: 600,
+    fontFamily: "'Space Grotesk', sans-serif", padding: "10px 16px", borderRadius: 10, cursor: "pointer",
+    background: filled ? accent : "transparent", color: filled ? "#04202f" : accent,
+    border: `1px solid ${outline ? "rgba(255,255,255,0.15)" : accent}`,
+    transition: "transform 0.15s ease",
+  };
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
