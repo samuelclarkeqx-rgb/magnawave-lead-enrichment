@@ -230,7 +230,6 @@ async function runGeneration(isRegenerate) {
       body: JSON.stringify({
         model: MODEL, max_tokens: 1000, system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userMsg }],
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
       }),
     });
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
